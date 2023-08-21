@@ -1,0 +1,181 @@
+#!/bin/python3
+from bs4 import BeautifulSoup
+import requests
+import subprocess
+import argparse
+import os
+
+BASE_URL="https://www.asciiart.eu"
+
+def read_resp():
+	r = input()
+	while r != 'y' and r != 'Y' and r != 'n' and r != 'N':
+		print("Please answer [Y/N] ", end='')
+		r = input()
+	if r == 'y' or r == 'Y':
+		return True
+	return  False
+
+def check_dimension(ascii, min_w, max_w, min_h, max_h):
+	n = 0
+	tmp = ascii.split('\n')
+	if len(tmp) < min_h or len(tmp) > max_h:
+		return False
+	for i in range(len(tmp)):
+		if len(tmp[i]) > max_w:
+			return False
+		if len(tmp[i]) < min_w:
+			n += 1
+	# if only half of lines are below min_w its considered valid ascii
+	if n > int(len(tmp)/2):
+		return False
+	return True
+
+def scrap_page(page, save_dir, auto, min_w, max_w, min_h, max_h, show):
+	try:
+		req = requests.get(BASE_URL+page)
+		soup = BeautifulSoup(req.text, "html.parser")
+	except:
+		print(f"Error scrapping {page}, error requesting {BASE_URL+page}")
+		return 0
+	asciis = soup.find_all("div", {"class": "border-header border-top p-3"})
+	if asciis == None:
+		print(f'Error scrapping {page}, <div class="border-header border-top p-3"> not found in {BASE_URL+page}')
+		return 0
+	ret = 0
+	for ascii in asciis:
+		tmp = ascii.find("pre")
+		if tmp == None:
+			continue
+		elif check_dimension(tmp.text, min_w, max_w, min_h, max_h) == False:
+			continue
+		if show == True or auto == False:
+			p = subprocess.Popen(["lolcat", "-f"], stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+			txt = p.communicate(input=tmp.text.encode())[0]
+			p.wait()
+			p.terminate()
+			print(txt.decode())
+		if auto == False:
+			print("Save ? [Y/N] ", end='')
+			if read_resp() == True:
+				try:
+					d = f"{save_dir}{page[1:].replace('/', '_')}_{ret}"
+					with open(d, 'w') as fp:
+						fp.write(tmp.text)
+					ret += 1
+					print(f"ascii saved in {d}")
+				except:
+					pass
+		else:
+			try:
+				d = f"{save_dir}{page[1:].replace('/', '_')}_{ret}"
+				with open(d, 'w') as fp:
+					fp.write(tmp.text)
+				ret += 1
+				print(f"ascii saved in {d}")
+			except:
+				pass
+	return ret
+
+def scrap_theme(theme, save_dir, auto, min_w, max_w, min_h, max_h, show):
+	try:
+		req = requests.get(BASE_URL+theme)
+		soup = BeautifulSoup(req.text, "html.parser")
+	except:
+		print(f"Error scrapping {theme}, error requesting {BASE_URL+theme}")
+		return 0
+	dirs = soup.find("div", {"class": "directory-columns"})
+	if dirs == None:
+		print(f'Error scrapping {theme}, <div class="directory-columns"> not found in {BASE_URL+theme}')
+		return 0
+	pages = dirs.find_all("li")
+	if pages == None:
+		print(f"Error scrapping {theme}, no pages found")
+		return 0
+	ret = 0
+	print(f"Found {len(pages)} pages")
+	for li in pages:
+		tmp = li.find('a')
+		if tmp == None:
+			continue
+		if auto == False:
+			print(f"Scrap page {tmp.text} ? [Y/N] ", end='')
+			if read_resp() == True:
+				ret += scrap_page(tmp['href'], save_dir, auto, min_w, max_w, min_h, max_h, show)
+		else:
+			print(f"Scrapping page {tmp.text}")
+			ret += scrap_page(tmp['href'], save_dir, auto, min_w, max_w, min_h, max_h, show)
+	return ret
+
+def main():
+	try:
+		p = subprocess.Popen(["lolcat"])
+		p.terminate()
+	except:
+		print("Please install lolcat first: sudo apt install lolcat")
+		exit()
+	parser = argparse.ArgumentParser(description='Ascii art scrapper (https://www.asciiart.eu)')
+	parser.add_argument('dest', type=str,
+			help='Destination folder for the ascii images.')
+	parser.add_argument('-a', '--auto', action='store_true',
+			help="Scrap automaticly all asciis that fit in between [min_width,max_width] and [min_height,max_height], you won't be prompted.")
+	parser.add_argument('--min_width', type=int, default=0,
+			help='Min width of the ascii to scrap, automatique or not the paramter count (default 0).')
+	parser.add_argument('--max_width', type=int, default=1000,
+			help='Max width of the ascii to scrap, automatique or not the paramter count (default 1000).')
+	parser.add_argument('--min_height', type=int, default=0,
+			help='Min height of the ascii to scrap, automatique or not the paramter count (default 0).')
+	parser.add_argument('--max_height', type=int, default=1000,
+			help='Max height of the ascii to scrap, automatique or not the paramter count (default 1000).')
+	parser.add_argument('--show', action="store_true",
+			help='If auto is set, show the ascii art with lolcat while saving them, if auto is not set this paramter is ignored.')
+
+	args = parser.parse_args()
+
+	if not os.path.isdir(args.dest):
+		print(f"Error: {args.dest} does not exist")
+		exit()
+	if not os.access(args.dest, os.W_OK):
+		print(f"Error: user does not have write permission to {args.dest}")
+		exit()
+
+	print(f'Destination folder : {args.dest}')
+	print(f'Auto : {args.auto}')
+	print(f'min_width = {args.min_width}')
+	print(f'max_width = {args.max_width}')
+	print(f'min_height = {args.min_height}')
+	print(f'max_height = {args.max_height}')
+	print(f'show : {args.show}')
+	print('')
+
+	dest = args.dest
+	if dest[len(dest)-1] != '/':
+		dest += '/'
+
+	print("Start scrapping")
+	total = 0
+	try:
+		req = requests.get(BASE_URL)
+		soup = BeautifulSoup(req.text, "html.parser")
+	except:
+		print(f"Error requesting {BASE_URL}")
+		exit()
+	dirs = soup.find("div", {"class": "directory-columns"})
+	if dirs == None:
+		print(f'Error scrapping, <div class="directory-columns"> not found in {BASE_URL}')
+		exit()
+	for li in dirs.find_all("li"):
+		tmp = li.find('a')
+		if tmp == None:
+			continue
+		if args.auto == False:
+			print(f"Scrap theme {tmp.text} ? [Y/N] ", end='')
+			if read_resp() == True:
+				total += scrap_theme(tmp['href'], dest, args.auto, args.min_width, args.max_width, args.min_height, args.max_height, args.show)
+		else:
+			print(f'Scrapping theme {tmp.text}...')
+			total += scrap_theme(tmp['href'], dest, args.auto, args.min_width, args.max_width, args.min_height, args.max_height, args.show)
+	print(f"Successfully scrapped {total} asciis !")
+
+if __name__ == '__main__':
+	main()

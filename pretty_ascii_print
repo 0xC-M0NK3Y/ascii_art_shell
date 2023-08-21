@@ -1,0 +1,68 @@
+#!/bin/bash
+
+if [ $# -ne 1 ]
+then
+	echo "Usage pretty_ascii_print <directory>"
+	exit
+fi
+
+# get width (image must only fit width, some are too big for the height I still want to see them)
+width=$(tput cols)
+asciiwidth=$width
+let "asciiwidth += 1"
+# get a random file
+while (( $asciiwidth > $width ))
+do
+	randfile=$(ls -d $1/* | sort -R | head -n1)
+	asciiwidth=$(cat $randfile | wc -L )
+done
+# calculate duration (duration will last between 1 and 3secondes)
+lines=$(cat $randfile | wc -l)
+duration=$lines
+let "duration *= -2"
+let "duration += 80"
+if (( $duration <= 10 ))
+then
+	duration=10
+fi
+
+# special ;)
+special=$RANDOM
+
+# get random spread
+spread=$RANDOM
+let "spread %= 3"
+if (( $spread == 0 ))
+then
+	spread=$(echo -n "0.$((RANDOM%9998+1))")
+elif (( $spread == 1 ))
+then
+	spread=$RANDOM
+	let "spread = spread % 10 + 1"
+else
+	spread=$RANDOM
+	let "spread = spread % 1000 + 1"
+fi
+
+# get random freq
+freq=$RANDOM
+let "freq %= 10"
+if (( $freq < 1 ))
+then
+	freq=$(echo -n "0.$((RANDOM%9998+1))")
+elif (( $freq < 5 ))
+then
+	freq=$RANDOM
+	let "freq = freq % 10 + 1"
+else
+	freq=$RANDOM
+	let "freq = freq % 100 + 1"
+fi
+
+if (( $special == 0 ))
+then
+	lolcat -f -a -t -i --spread=$spread --duration=$duration --speed=10000000 --freq=$freq $randfile
+else
+	lolcat -f -a -t --spread=$spread --duration=$duration --speed=10000000 --freq=$freq $randfile
+fi
+
