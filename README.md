@@ -7,7 +7,10 @@ When you launch a terminal it will display random rainbow ascii arts.
 To stop just press any key.  
   
   
-https://github.com/0xC-M0NK3Y/ascii_art_shell/assets/102142537/30763fbe-ddee-4242-a848-647e0ad3b875
+
+https://github.com/0xC-M0NK3Y/ascii_art_shell/assets/102142537/c5008431-c1d7-4aa0-bcf0-3818ef0c8b07
+
+
 
   
 # Installation
